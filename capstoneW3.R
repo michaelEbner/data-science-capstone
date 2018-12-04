@@ -5,11 +5,13 @@ library(ggplot2)
 library(gridExtra)
 library(rJava)
 library(openNLP)
-library(scals)
 library(tm)
 library(textcat)
 
-setwd('/Users/mickey/Documents/GitHub/data-science-capstone')
+#setwd('/Users/mickey/Documents/GitHub/data-science-capstone')
+setwd('/Users/mebner/Documents/for_me/R_coursera/data-science-capstone')
+
+path_to_data <- '/Users/mebner/Documents/for_me/R_coursera/final/'
 
 #table length function
 #et_counts <- function (filename) {
@@ -33,8 +35,7 @@ filename = 'en_US.news.txt'
 prob = 0.05
 
 get_sample <- function (filename,prob) {
-  path <- paste0('final/',substring(filename, 1,5),'/',filename)
-  # load Google's list of bad words
+  path <- paste0(path_to_data,substring(filename, 1,5),'/',filename)
   con <- file(path,"r")
   full <- readLines(con, encoding="UTF-8")
   close(con)
@@ -49,7 +50,15 @@ clean_data <- function(sample) {
     mutate(words = gsub("@\\w+", " ", words)) %>%
     mutate(words = removePunctuation(words,preserve_intra_word_contractions = TRUE,preserve_intra_word_dashes = TRUE)) %>%
     mutate(words = gsub("[^\x20-\x7E]", "", words)) %>%
-    mutate(words = gsub("  "," ",words))
+    mutate(words = gsub("  "," ",words)) %>%
+    mutate(words = gsub("n\'t", " not", words)) %>%
+    mutate(words = gsub("\'re", " are", words)) %>%
+    mutate(words = gsub("\'s", " is", words)) %>%
+    mutate(words = gsub("\'d", " would", words)) %>%
+    mutate(words = gsub("\'ll", " will", words)) %>%
+    mutate(words = gsub("\'t", " not", words)) %>%
+    mutate(words = gsub("\'ve", " have", words)) %>%
+    mutate(words = gsub("\'m", " am", words))
   #tokinize the text, get words, 2-grams and 3-grams. We keep stopwords as they are relevant for this task
   sample <- as.vector(sample[,1]) %>%
     tokenize_ngrams(n = 4, n_min = 1) %>%
@@ -57,6 +66,7 @@ clean_data <- function(sample) {
     as.data.frame() %>% mutate(language = str_sub(filename,1,5),media = str_extract(filename,'blogs|news|twitter'))
   colnames(sample)[1] <- "words"
   #sample file with gram type and bad word column
+  en_bad <- read.table("badlanguage.txt")
   sample <- sample %>% mutate(type = paste0(str_count(words, ' ')+1,'-grams'),bad_word = grepl(paste0('((^| )',unlist(en_bad),'( |$))', collapse="|"),words))
   #get rid of numbers only recoreds and records that end with a number
   sample <- sample %>% subset(!grepl('^[0-9, ]+$',words) & !grepl('.*[0-9, ]$',words)) %>%
@@ -81,16 +91,16 @@ gsub('[a-z]{5}\\/[a-z]{2}_[A-Z]{2}\\/','',files)
 prob = 0.05
 
 #run getsample for each file selectd
-blog_sample <- get_sample('en_US.blogs.txt',0.05)
-news_sample <- get_sample('en_US.news.txt',0.05)
-twitter_sample <- get_sample('en_US.twitter.txt',0.025)
+blog_sample <- get_sample('en_US.blogs.txt',prob)
+news_sample <- get_sample('en_US.news.txt',prob)
+twitter_sample <- get_sample('en_US.twitter.txt',prob)
 
 #run getsample for each file selectd
 blog_sample <- clean_data(blog_sample)
 news_sample <- clean_data(news_sample)
 twitter_sample <- clean_data(twitter_sample)
 
-sample <- rbind(blog_sample,news_sample,twitter_sample)
+sample <- rbind(blog_sample %>% subset(bad_word = 'FALSE'),news_sample %>% subset(bad_word = 'FALSE'),twitter_sample %>% subset(bad_word = 'FALSE'))
 
 #read freq files
 blog_freq <- getfrequencies(blog_sample)
